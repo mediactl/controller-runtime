@@ -195,7 +195,20 @@ func decodeApplyResponse(contentType string, body []byte, into any) error {
 	case runtime.ContentTypeJSON:
 		return json.Unmarshal(body, into)
 	case runtime.ContentTypeCBOR:
-		return cbordirect.Unmarshal(body, into)
+		// The apply configurations omit fields the apiserver answers with
+		// (metadata.managedFields, for one), and apimachinery's direct CBOR
+		// decoder refuses an unknown field where encoding/json drops it:
+		// transcode through a generic map and the JSON path, so a CBOR
+		// answer is read exactly as the JSON answer was.
+		var m map[string]any
+		if err := cbordirect.Unmarshal(body, &m); err != nil {
+			return err
+		}
+		js, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(js, into)
 	}
 	return fmt.Errorf("unexpected content type %q in apply response, expected application/json or application/cbor", contentType)
 }
