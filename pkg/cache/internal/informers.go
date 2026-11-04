@@ -91,7 +91,7 @@ func NewInformers(config *rest.Config, options *InformersOpts) *Informers {
 			Unstructured: make(map[schema.GroupVersionKind]*Cache),
 			Metadata:     make(map[schema.GroupVersionKind]*Cache),
 		},
-		codecs:                serializer.NewCodecFactory(options.Scheme),
+		codecs:                rest.CodecFactoryForGeneratedClient(options.Scheme, serializer.NewCodecFactory(options.Scheme)),
 		paramCodec:            runtime.NewParameterCodec(options.Scheme),
 		resync:                options.ResyncPeriod,
 		startWait:             make(chan struct{}),

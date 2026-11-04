@@ -212,7 +212,7 @@ func newClient(config *rest.Config, options Options) (*client, Client, error) {
 		config:     config,
 		scheme:     options.Scheme,
 		mapper:     options.Mapper,
-		codecs:     serializer.NewCodecFactory(options.Scheme),
+		codecs:     rest.CodecFactoryForGeneratedClient(options.Scheme, serializer.NewCodecFactory(options.Scheme)),
 
 		resourceByType: make(map[cacheKey]*resourceMeta),
 	}
