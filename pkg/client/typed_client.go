@@ -20,9 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	cbordirect "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/client-go/util/apply"
 )
 
@@ -178,11 +180,24 @@ func (c *typedClient) Apply(ctx context.Context, obj runtime.ApplyConfiguration,
 		return err
 	}
 
-	if contentType != "application/json" {
-		return fmt.Errorf("unexpected content type %q in apply response, expected application/json", contentType)
-	}
+	return decodeApplyResponse(contentType, body, obj)
+}
 
-	return json.Unmarshal(body, obj)
+// decodeApplyResponse decodes an apply's answer by its content type: JSON
+// as before, or CBOR, which the apiserver answers with when client-go's
+// ClientsPreferCBOR gate made the request ask for it (the clustarr fork).
+func decodeApplyResponse(contentType string, body []byte, into any) error {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType = contentType
+	}
+	switch mediaType {
+	case runtime.ContentTypeJSON:
+		return json.Unmarshal(body, into)
+	case runtime.ContentTypeCBOR:
+		return cbordirect.Unmarshal(body, into)
+	}
+	return fmt.Errorf("unexpected content type %q in apply response, expected application/json or application/cbor", contentType)
 }
 
 // Get implements client.Client.
@@ -369,9 +384,5 @@ func (c *typedClient) ApplySubResource(ctx context.Context, obj runtime.ApplyCon
 		return err
 	}
 
-	if contentType != "application/json" {
-		return fmt.Errorf("unexpected content type %q in apply response, expected application/json", contentType)
-	}
-
-	return json.Unmarshal(respBody, obj)
+	return decodeApplyResponse(contentType, respBody, obj)
 }
